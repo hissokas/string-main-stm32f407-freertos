@@ -94,11 +94,16 @@ uint8_t main_ID = 0x01;
 uint16_t humi_val_i = 0,temp_val_i = 0;
 SHT1x sht1x; 
 
-char gprs_connect_str[] = "AT+CIPSTART=\"TCP\",\"XXX.XXX.XXX.XXX\",\"50000\"\r\n";
+char gprs_connect_str[] = "AT+CIPSTART=\"TCP\",\"xxx.xxx.xxx.xxx\",\"50000\"\r\n";
 char gprs_send_str[] = "AT+CIPSEND=81\r\n";
 char gprs_disconnect_str[] = "AT+CIPCLOSE\r\n";
 char gprs_shut_str[] = "AT+CIPSHUT\r\n";
 char gprs_noecho_str[] = "ATE0\r\n";
+char gprs_handshake_str[] = "AT\r\n";
+
+char rt_OK[] = "OK";
+char rt_CONNECT_OK[] = "CONNECT OK";
+char rt_SEND_OK[] = "SEND OK";
 
 enum{
 	HANDSHAKE = 0,
@@ -747,6 +752,7 @@ void FUNC_CAN(void const * argument)
   for(;;)
   {
     xSemaphoreTake(CountingSem_canHandle,portMAX_DELAY);
+		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_RESET);
 		get_SHT1x();
 		hcan1.pTxMsg->StdId = 0x01;
 		HAL_CAN_Transmit(&hcan1, 1000);
@@ -792,19 +798,10 @@ void FUNC_GPRS(void const * argument)
 		HAL_UART_Transmit(&huart6,gprs_rxbuf,gprs_rxlen,1000);
 		if(pdsem == pdTRUE)
 		{
-			if(gprs_rxbuf[0] == '+' && serial_rxbuf[1] == 'P')
+			if((strstr((char *)gprs_rxbuf,"+PDP: DEACT") != NULL) || (strstr((char *)gprs_rxbuf,"CLOSED") != NULL))
 			{
 				GPRSSTATE = SHUT;
 				HAL_UART_Transmit(&huart1,(uint8_t *)gprs_shut_str,strlen(gprs_shut_str),1000);
-			}
-			else if(gprs_rxlen >= 17)
-			{
-				if(gprs_rxbuf[gprs_rxlen -1] == 'E')
-				{
-						xSemaphoreGive(CountingSem_canHandle);
-						GPRSSTATE = SEND;
-						HAL_UART_Transmit(&huart1,(uint8_t *)gprs_send_str,strlen(gprs_send_str),1000);
-				}
 			}
 			else
 			{
@@ -812,45 +809,81 @@ void FUNC_GPRS(void const * argument)
 				{
 					case CONNECT:
 					{
-						GPRSSTATE = TCPACK;
+						if(strstr((char *)gprs_rxbuf,"OK") != NULL)
+							GPRSSTATE = TCPACK;
 						break;
 					}
 					case TCPACK:
 					{
-						GPRSSTATE = WAITFORCMD;
+						if(strstr((char *)gprs_rxbuf,"CONNECT OK") || (strstr((char *)gprs_rxbuf,"ALREADY CONNECT") != NULL))
+							GPRSSTATE = WAITFORCMD;
+						else if(strstr((char *)gprs_rxbuf,"CONNECT FAIL") || (strstr((char *)gprs_rxbuf,"+CME ERROR") != NULL))
+						{
+							GPRSSTATE = SHUT;
+							HAL_UART_Transmit(&huart1,(uint8_t *)gprs_shut_str,strlen(gprs_shut_str),1000);
+						}
 						break;
 					}
 					case HANDSHAKE:
 					{
-						GPRSSTATE = CONNECT;
-						HAL_UART_Transmit(&huart1,(uint8_t *)gprs_connect_str,strlen(gprs_connect_str),1000);
+						if(strstr((char *)gprs_rxbuf,"ATE0") != NULL)
+						{
+							GPRSSTATE = CONNECT;
+							HAL_UART_Transmit(&huart1,(uint8_t *)gprs_connect_str,strlen(gprs_connect_str),1000);
+						}
 						break;
 					}
 					case SHUT:
 					{
-						GPRSSTATE = CONNECT;
-						HAL_UART_Transmit(&huart1,(uint8_t *)gprs_connect_str,strlen(gprs_connect_str),1000);
+						osDelay(5000);
+						if(strstr((char *)gprs_rxbuf,"SHUT OK") != NULL)
+						{
+							GPRSSTATE = CONNECT;
+							HAL_UART_Transmit(&huart1,(uint8_t *)gprs_connect_str,strlen(gprs_connect_str),1000);
+						}
 						break;
 					}
 					case WAITFORCMD:
 					{
+						if(gprs_rxlen >= 17)
+						{
+							if(strstr((char *)gprs_rxbuf,"REQUEST FOR DATA!") != NULL)
+							{
+								xSemaphoreGive(CountingSem_canHandle);
+								GPRSSTATE = SEND;
+								HAL_UART_Transmit(&huart1,(uint8_t *)gprs_send_str,strlen(gprs_send_str),1000);
+								HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_SET);
+							}
+						}
 						break;
 					}
 					case SEND:
 					{
-						GPRSSTATE = WAITFORSDC;
-						HAL_UART_Transmit(&huart1,&data_to_send[0][0],81,1000);
+						if(strstr((char *)gprs_rxbuf,">") != NULL)
+						{
+							GPRSSTATE = WAITFORSDC;
+							HAL_UART_Transmit(&huart1,&data_to_send[0][0],81,1000);
+						}
 						break;
 					}
 					case WAITFORSDC:
 					{
-						GPRSSTATE = WAITFORCMD;
+						if(strstr((char *)gprs_rxbuf,"SEND OK") != NULL)
+						{
+							GPRSSTATE = WAITFORCMD;
+						}
+						else if((strstr((char *)gprs_rxbuf,"SEND FAIL") != NULL) || (strstr((char *)gprs_rxbuf,"+CME ERROR") != NULL))
+						{
+							GPRSSTATE = SHUT;
+							HAL_UART_Transmit(&huart1,(uint8_t *)gprs_shut_str,strlen(gprs_shut_str),1000);
+						}
 						break;
 					}
 					default: break;
 				}
 			}
 		}
+		memset(gprs_rxbuf,0,sizeof(gprs_rxbuf));
 		HAL_UART_Receive_DMA(&huart1,gprs_rxbuf,BUFFER_SIZE);
   }
   /* USER CODE END FUNC_GPRS */
