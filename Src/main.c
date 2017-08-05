@@ -697,11 +697,11 @@ void FUNC_SERIAL(void const * argument)
   {
 		pdsem = xSemaphoreTake(BinarySem_serialHandle,portMAX_DELAY);
 		
-		HAL_UART_Transmit(&huart1,serial_rxbuf,serial_rxlen,1000); //测试GPRS用，之后记得注掉
+		//HAL_UART_Transmit(&huart1,serial_rxbuf,serial_rxlen,1000); //测试GPRS用，之后记得注掉
 		
 		if(pdsem == pdTRUE)
 		{
-			if(serial_rxbuf[2] == 0x01 && serial_rxbuf[3] == 0x02 && serial_rxlen >= 17)
+			if(strstr((char *)serial_rxbuf,"REQUEST FOR DATA!") != NULL)
 				;
 			else 
 			{
@@ -714,6 +714,7 @@ void FUNC_SERIAL(void const * argument)
 		{
 			HAL_UART_Transmit(&huart6,&data_to_send[i][0],81,1000);
 		}
+		memset(serial_rxbuf,0,sizeof(serial_rxbuf));
 		HAL_UART_Receive_DMA(&huart6,serial_rxbuf,BUFFER_SIZE);
   }
   /* USER CODE END FUNC_SERIAL */
@@ -779,6 +780,7 @@ void FUNC_CAN(void const * argument)
 			pcan_rxbuf += 32;
 		}
 		data_calc();
+		memset(can_rxbuf,0,sizeof(can_rxbuf));
   }
   /* USER CODE END FUNC_CAN */
 }
@@ -787,6 +789,7 @@ void FUNC_CAN(void const * argument)
 void FUNC_GPRS(void const * argument)
 {
   /* USER CODE BEGIN FUNC_GPRS */
+	int send_count = 0, send_flag = 0;
 	BaseType_t pdsem = pdFALSE;
 	HAL_UART_Receive_DMA(&huart1,gprs_rxbuf,BUFFER_SIZE);
 	osDelay(20000);
@@ -795,7 +798,7 @@ void FUNC_GPRS(void const * argument)
  for(;;)
   {
     pdsem = xSemaphoreTake(BinarySem_gprsHandle,portMAX_DELAY);
-		HAL_UART_Transmit(&huart6,gprs_rxbuf,gprs_rxlen,1000);
+		//HAL_UART_Transmit(&huart6,gprs_rxbuf,gprs_rxlen,1000);
 		if(pdsem == pdTRUE)
 		{
 			if((strstr((char *)gprs_rxbuf,"+PDP: DEACT") != NULL) || (strstr((char *)gprs_rxbuf,"CLOSED") != NULL))
@@ -847,6 +850,7 @@ void FUNC_GPRS(void const * argument)
 					{
 						if(gprs_rxlen >= 17)
 						{
+							//if(strstr((char *)gprs_rxbuf,"S") != NULL)
 							if(strstr((char *)gprs_rxbuf,"REQUEST FOR DATA!") != NULL)
 							{
 								xSemaphoreGive(CountingSem_canHandle);
@@ -855,6 +859,12 @@ void FUNC_GPRS(void const * argument)
 								HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_SET);
 							}
 						}
+						else if(send_flag == 1)
+						{
+								GPRSSTATE = SEND;
+								HAL_UART_Transmit(&huart1,(uint8_t *)gprs_send_str,strlen(gprs_send_str),1000);
+								HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_SET);
+						}
 						break;
 					}
 					case SEND:
@@ -862,7 +872,8 @@ void FUNC_GPRS(void const * argument)
 						if(strstr((char *)gprs_rxbuf,">") != NULL)
 						{
 							GPRSSTATE = WAITFORSDC;
-							HAL_UART_Transmit(&huart1,&data_to_send[0][0],81,1000);
+							HAL_UART_Transmit(&huart1,&data_to_send[send_count][0],81,1000);
+							send_count ++;
 						}
 						break;
 					}
@@ -871,6 +882,17 @@ void FUNC_GPRS(void const * argument)
 						if(strstr((char *)gprs_rxbuf,"SEND OK") != NULL)
 						{
 							GPRSSTATE = WAITFORCMD;
+							if(send_count <  SUB_BOARD)
+							{
+								osDelay(1000);
+								send_flag = 1;
+								xSemaphoreGive(BinarySem_gprsHandle);
+							}
+							else
+							{
+								send_count = 0;
+								send_flag = 0;
+							}
 						}
 						else if((strstr((char *)gprs_rxbuf,"SEND FAIL") != NULL) || (strstr((char *)gprs_rxbuf,"+CME ERROR") != NULL))
 						{
@@ -902,7 +924,7 @@ void FUNC_NEPORT(void const * argument)
     pdsem = xSemaphoreTake(BinarySem_neportHandle,portMAX_DELAY);
 		if(pdsem == pdTRUE)
 		{
-			if(neport_rxbuf[2] == 0x01 && neport_rxbuf[3] == 0x02 && neport_rxlen >= 17)
+			if(strstr((char *)neport_rxbuf,"REQUEST FOR DATA!") != NULL)
 				;
 			else 
 			{
@@ -915,6 +937,7 @@ void FUNC_NEPORT(void const * argument)
 		{
 			HAL_UART_Transmit(&huart2,&data_to_send[i][0],81,1000);
 		}
+		memset(neport_rxbuf,0,sizeof(neport_rxbuf));
 		HAL_UART_Receive_DMA(&huart2,neport_rxbuf,BUFFER_SIZE);
   }
   /* USER CODE END FUNC_NEPORT */
