@@ -99,21 +99,14 @@ char gprs_send_str[] = "AT+CIPSEND=81\r\n";
 char gprs_disconnect_str[] = "AT+CIPCLOSE\r\n";
 char gprs_shut_str[] = "AT+CIPSHUT\r\n";
 char gprs_noecho_str[] = "ATE0\r\n";
-char gprs_handshake_str[] = "AT\r\n";
-
-char rt_OK[] = "OK";
-char rt_CONNECT_OK[] = "CONNECT OK";
-char rt_SEND_OK[] = "SEND OK";
 
 enum{
 	HANDSHAKE = 0,
-	STOPECHO,
 	CONNECT,
 	TCPACK,
 	WAITFORCMD,
 	SEND,
 	WAITFORSDC,
-	TCPCLOSE,
 	SHUT
 };
 uint8_t GPRSSTATE = 0;
@@ -702,18 +695,18 @@ void FUNC_SERIAL(void const * argument)
 		if(pdsem == pdTRUE)
 		{
 			if(strstr((char *)serial_rxbuf,"REQUEST FOR DATA!") != NULL)
-				;
-			else 
 			{
-				HAL_UART_Receive_DMA(&huart6,serial_rxbuf,BUFFER_SIZE);
-				continue;
+				HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_SET); // 485发送使能
+				xSemaphoreGive(CountingSem_canHandle);
+				for(i = 0;i < SUB_BOARD;i ++)
+				{
+					HAL_UART_Transmit(&huart6,&data_to_send[i][0],81,1000);
+				}
+				HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_RESET); // 485接收使能
 			}
 		}
-		xSemaphoreGive(CountingSem_canHandle);
-		for(i = 0;i < SUB_BOARD;i ++)
-		{
-			HAL_UART_Transmit(&huart6,&data_to_send[i][0],81,1000);
-		}
+		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_14, GPIO_PIN_RESET); // 485接收使能
 		memset(serial_rxbuf,0,sizeof(serial_rxbuf));
 		HAL_UART_Receive_DMA(&huart6,serial_rxbuf,BUFFER_SIZE);
   }
@@ -925,17 +918,14 @@ void FUNC_NEPORT(void const * argument)
 		if(pdsem == pdTRUE)
 		{
 			if(strstr((char *)neport_rxbuf,"REQUEST FOR DATA!") != NULL)
-				;
-			else 
 			{
-				HAL_UART_Receive_DMA(&huart2,neport_rxbuf,BUFFER_SIZE);
-				continue;
+				xSemaphoreGive(CountingSem_canHandle);
+				for(i = 0;i < SUB_BOARD;i ++)
+				{
+					HAL_UART_Transmit(&huart2,&data_to_send[i][0],81,1000);
+				}
+				HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_SET);
 			}
-		}
-		xSemaphoreGive(CountingSem_canHandle);
-		for(i = 0;i < SUB_BOARD;i ++)
-		{
-			HAL_UART_Transmit(&huart2,&data_to_send[i][0],81,1000);
 		}
 		memset(neport_rxbuf,0,sizeof(neport_rxbuf));
 		HAL_UART_Receive_DMA(&huart2,neport_rxbuf,BUFFER_SIZE);

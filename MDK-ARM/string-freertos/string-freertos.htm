@@ -3,7 +3,7 @@
 <title>Static Call Graph - [string-freertos\string-freertos.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image string-freertos\string-freertos.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060528: Last Updated: Sat Aug 05 18:34:24 2017
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 5060528: Last Updated: Sun Aug 06 15:04:44 2017
 <BR><P>
 <H3>Maximum Stack Usage =        320 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -560,9 +560,9 @@ Global Symbols
 <P><STRONG><a name="[161]"></a>_memcpy_lastbytes_aligned</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, rt_memcpy_w.o(.text), UNUSED)
 
 <P><STRONG><a name="[90]"></a>__aeabi_memclr</STRONG> (Thumb, 0 bytes, Stack size 0 bytes, rt_memclr.o(.text))
-<BR><BR>[Called By]<UL><LI><a href="#[69]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_NEPORT
+<BR><BR>[Called By]<UL><LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_CAN
+<LI><a href="#[69]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_NEPORT
 <LI><a href="#[68]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_GPRS
-<LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_CAN
 </UL>
 
 <P><STRONG><a name="[7f]"></a>__rt_memclr</STRONG> (Thumb, 68 bytes, Stack size 0 bytes, rt_memclr.o(.text), UNUSED)
@@ -691,7 +691,7 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> main.o(.constdata)
 </UL>
-<P><STRONG><a name="[68]"></a>FUNC_GPRS</STRONG> (Thumb, 614 bytes, Stack size 0 bytes, main.o(i.FUNC_GPRS))
+<P><STRONG><a name="[68]"></a>FUNC_GPRS</STRONG> (Thumb, 612 bytes, Stack size 0 bytes, main.o(i.FUNC_GPRS))
 <BR><BR>[Stack]<UL><LI>Max Depth = 104<LI>Call Chain = FUNC_GPRS &rArr; xQueueGenericSend &rArr; vTaskPlaceOnEventList &rArr; prvAddCurrentTaskToDelayedList &rArr; vListInsert
 </UL>
 <BR>[Calls]<UL><LI><a href="#[8a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_GPIO_WritePin
@@ -714,10 +714,11 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> main.o(.constdata)
 </UL>
-<P><STRONG><a name="[69]"></a>FUNC_NEPORT</STRONG> (Thumb, 124 bytes, Stack size 0 bytes, main.o(i.FUNC_NEPORT))
+<P><STRONG><a name="[69]"></a>FUNC_NEPORT</STRONG> (Thumb, 122 bytes, Stack size 0 bytes, main.o(i.FUNC_NEPORT))
 <BR><BR>[Stack]<UL><LI>Max Depth = 104<LI>Call Chain = FUNC_NEPORT &rArr; xQueueGenericSend &rArr; vTaskPlaceOnEventList &rArr; prvAddCurrentTaskToDelayedList &rArr; vListInsert
 </UL>
-<BR>[Calls]<UL><LI><a href="#[94]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Transmit
+<BR>[Calls]<UL><LI><a href="#[8a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_GPIO_WritePin
+<LI><a href="#[94]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Transmit
 <LI><a href="#[91]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Receive_DMA
 <LI><a href="#[96]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;xQueueGenericSend
 <LI><a href="#[89]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;xQueueGenericReceive
@@ -726,10 +727,11 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> main.o(.constdata)
 </UL>
-<P><STRONG><a name="[66]"></a>FUNC_SERIAL</STRONG> (Thumb, 124 bytes, Stack size 0 bytes, main.o(i.FUNC_SERIAL))
+<P><STRONG><a name="[66]"></a>FUNC_SERIAL</STRONG> (Thumb, 156 bytes, Stack size 0 bytes, main.o(i.FUNC_SERIAL))
 <BR><BR>[Stack]<UL><LI>Max Depth = 104<LI>Call Chain = FUNC_SERIAL &rArr; xQueueGenericSend &rArr; vTaskPlaceOnEventList &rArr; prvAddCurrentTaskToDelayedList &rArr; vListInsert
 </UL>
-<BR>[Calls]<UL><LI><a href="#[94]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Transmit
+<BR>[Calls]<UL><LI><a href="#[8a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_GPIO_WritePin
+<LI><a href="#[94]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Transmit
 <LI><a href="#[91]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Receive_DMA
 <LI><a href="#[96]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;xQueueGenericSend
 <LI><a href="#[89]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;xQueueGenericReceive
@@ -820,8 +822,8 @@ Global Symbols
 </UL>
 <BR>[Calls]<UL><LI><a href="#[9a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_GetTick
 </UL>
-<BR>[Called By]<UL><LI><a href="#[dd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;SHT1x_Measure
-<LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_CAN
+<BR>[Called By]<UL><LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_CAN
+<LI><a href="#[dd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;SHT1x_Measure
 </UL>
 
 <P><STRONG><a name="[9b]"></a>HAL_GPIO_Init</STRONG> (Thumb, 466 bytes, Stack size 24 bytes, stm32f4xx_hal_gpio.o(i.HAL_GPIO_Init))
@@ -834,13 +836,15 @@ Global Symbols
 </UL>
 
 <P><STRONG><a name="[8a]"></a>HAL_GPIO_WritePin</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, stm32f4xx_hal_gpio.o(i.HAL_GPIO_WritePin))
-<BR><BR>[Called By]<UL><LI><a href="#[d1]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;MX_GPIO_Init
+<BR><BR>[Called By]<UL><LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_CAN
+<LI><a href="#[d1]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;MX_GPIO_Init
 <LI><a href="#[4]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HardFault_Handler
 <LI><a href="#[76]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 <LI><a href="#[cd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_Error_Handler
+<LI><a href="#[66]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_SERIAL
+<LI><a href="#[69]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_NEPORT
 <LI><a href="#[65]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_LED
 <LI><a href="#[68]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_GPRS
-<LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_CAN
 </UL>
 
 <P><STRONG><a name="[9a]"></a>HAL_GetTick</STRONG> (Thumb, 6 bytes, Stack size 0 bytes, stm32f4xx_hal.o(i.HAL_GetTick))
@@ -1697,11 +1701,11 @@ Global Symbols
 <LI><a href="#[122]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;vTaskPlaceOnEventList
 <LI><a href="#[129]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;pvTaskIncrementMutexHeldCount
 </UL>
-<BR>[Called By]<UL><LI><a href="#[76]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
+<BR>[Called By]<UL><LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_CAN
+<LI><a href="#[76]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 <LI><a href="#[66]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_SERIAL
 <LI><a href="#[69]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_NEPORT
 <LI><a href="#[68]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_GPRS
-<LI><a href="#[67]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FUNC_CAN
 </UL>
 
 <P><STRONG><a name="[113]"></a>xQueueGenericReset</STRONG> (Thumb, 146 bytes, Stack size 16 bytes, queue.o(i.xQueueGenericReset))
