@@ -54,6 +54,7 @@
 #include <string.h>
 #include "arm_math.h"
 #include "SHT1X.h"
+#include "LED.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -68,11 +69,12 @@ DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart6_rx;
 
-osThreadId TASK_LEDHandle;
+osThreadId TASK_STATE_LEDHandle;
 osThreadId TASK_SERIALHandle;
 osThreadId TASK_CANHandle;
 osThreadId TASK_GPRSHandle;
 osThreadId TASK_NEPORTHandle;
+osThreadId TASK_SENSOR_LEDHandle;
 osSemaphoreId BinarySem_serialHandle;
 osSemaphoreId BinarySem_gprsHandle;
 osSemaphoreId BinarySem_neportHandle;
@@ -84,7 +86,7 @@ TickType_t PreviousWakeTime;
 uint8_t serial_rxbuf[BUFFER_SIZE]; 
 uint8_t neport_rxbuf[BUFFER_SIZE]; 
 uint8_t gprs_rxbuf[BUFFER_SIZE]; 
-uint8_t can_txbuf[8] = {1,2,3,4,5,6,7,8};
+uint8_t can_txbuf[8] = {1,2,3,4,5,6,7,8}; 
 uint8_t can_rxbuf[128];
 uint8_t serial_rxlen = 0; 
 uint8_t neport_rxlen = 0; 
@@ -93,6 +95,13 @@ uint8_t data_to_send[SUB_BOARD][81];
 uint8_t main_ID = 0x01;
 uint16_t humi_val_i = 0,temp_val_i = 0;
 SHT1x sht1x; 
+
+uint8_t sensor_online[LEDn] = {0};
+uint8_t channel_count = 0;
+float sensor_frequency[LEDn] = {0};
+float sensor_temp[LEDn] = {0};
+extern GPIO_TypeDef* LED_PORT[LEDn];
+extern uint16_t LED_PIN[LEDn];
 
 char gprs_connect_str[] = "AT+CIPSTART=\"TCP\",\"xxx.xxx.xxx.xxx\",\"50000\"\r\n";
 char gprs_send_str[] = "AT+CIPSEND=81\r\n";
@@ -123,16 +132,18 @@ static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART6_UART_Init(void);
-void FUNC_LED(void const * argument);
+void FUNC_STATE_LED(void const * argument);
 void FUNC_SERIAL(void const * argument);
 void FUNC_CAN(void const * argument);
 void FUNC_GPRS(void const * argument);
 void FUNC_NEPORT(void const * argument);
+void FUNC_SENSOR_LED(void const * argument);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 void data_calc(void);
 void get_SHT1x(void);
+void get_ID(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -141,8 +152,8 @@ void data_calc()
 	int i,s,m,j;
 	float count;
 	float adc;
-	float frequency;
-	float temp,temp_log;
+	uint16_t frequency, temp;
+	float temp_log;
 	float A;
 	float B;
 	float C;
@@ -170,19 +181,21 @@ void data_calc()
 			for(j = 0;j < 8;j ++)
 			{
 				count = can_rxbuf[j * 4 + m * 32 + i * 64]*256 + can_rxbuf[j * 4 + m * 32 + i * 64 + 1];
-				frequency = 10000000.0f / count;
+				sensor_frequency[channel_count] = 10000000.0f / count;
 				
 				adc = (can_rxbuf[j * 4 + m * 32 + i * 64 + 2]*256 + can_rxbuf[j * 4 + m * 32 + i * 64 + 3])*4.5185f;
 				temp_log = log(adc);
-				temp = 1.0f / (A + B * temp_log + C * temp_log * temp_log * temp_log) - 273.2f; 
+				sensor_temp[channel_count] = 1.0f / (A + B * temp_log + C * temp_log * temp_log * temp_log) - 273.2f; 
 				
-				frequency = frequency * 10;
-				temp = temp * 100;
+				frequency = (uint16_t)(sensor_frequency[channel_count] * 10);
+				temp = (uint16_t)(sensor_temp[channel_count] * 100);
 				
-				data_to_send[i][s] = (uint16_t)(frequency) >> 8;s++;
-				data_to_send[i][s] = (uint16_t)(frequency);     s++;
-				data_to_send[i][s] = (uint16_t)(temp) >> 8;     s++; 
-				data_to_send[i][s] = (uint16_t)(temp);          s++;						
+				data_to_send[i][s] = frequency >> 8;s++;
+				data_to_send[i][s] = frequency;     s++;
+				data_to_send[i][s] = temp >> 8;     s++; 
+				data_to_send[i][s] = temp;          s++;	
+
+				channel_count ++;
 			}
 		}
 		
@@ -218,6 +231,21 @@ void get_SHT1x()
     sht1x.Temperature=sht1x.T_Result;
     sht1x.Humidity=(uint16_t)sht1x.H_Result; 
   }
+}
+
+void get_ID()
+{
+	main_ID = 0;
+	if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_5) == GPIO_PIN_SET)
+		main_ID += 1;
+	if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_4) == GPIO_PIN_SET)
+		main_ID += 2;
+	if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_3) == GPIO_PIN_SET)
+		main_ID += 4;
+	if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_2) == GPIO_PIN_SET)
+		main_ID += 8;
+	if(HAL_GPIO_ReadPin(GPIOD, GPIO_PIN_1) == GPIO_PIN_SET)
+		main_ID += 16;
 }
 /* USER CODE END 0 */
 
@@ -309,9 +337,9 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* Create the thread(s) */
-  /* definition and creation of TASK_LED */
-  osThreadDef(TASK_LED, FUNC_LED, osPriorityLow, 0, 128);
-  TASK_LEDHandle = osThreadCreate(osThread(TASK_LED), NULL);
+  /* definition and creation of TASK_STATE_LED */
+  osThreadDef(TASK_STATE_LED, FUNC_STATE_LED, osPriorityLow, 0, 128);
+  TASK_STATE_LEDHandle = osThreadCreate(osThread(TASK_STATE_LED), NULL);
 
   /* definition and creation of TASK_SERIAL */
   osThreadDef(TASK_SERIAL, FUNC_SERIAL, osPriorityBelowNormal, 0, 128);
@@ -328,6 +356,10 @@ int main(void)
   /* definition and creation of TASK_NEPORT */
   osThreadDef(TASK_NEPORT, FUNC_NEPORT, osPriorityBelowNormal, 0, 128);
   TASK_NEPORTHandle = osThreadCreate(osThread(TASK_NEPORT), NULL);
+
+  /* definition and creation of TASK_SENSOR_LED */
+  osThreadDef(TASK_SENSOR_LED, FUNC_SENSOR_LED, osPriorityLow, 0, 128);
+  TASK_SENSOR_LEDHandle = osThreadCreate(osThread(TASK_SENSOR_LED), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -558,8 +590,8 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5 
-                          |GPIO_PIN_6|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_0 
-                          |GPIO_PIN_1, GPIO_PIN_SET);
+                          |GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9 
+                          |GPIO_PIN_0|GPIO_PIN_1, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_0 
@@ -593,11 +625,13 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_SET);
 
   /*Configure GPIO pins : PE2 PE3 PE4 PE5 
-                           PE6 PE8 PE9 PE11 
-                           PE12 PE14 PE0 PE1 */
+                           PE6 PE7 PE8 PE9 
+                           PE11 PE12 PE14 PE0 
+                           PE1 */
   GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5 
-                          |GPIO_PIN_6|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_11 
-                          |GPIO_PIN_12|GPIO_PIN_14|GPIO_PIN_0|GPIO_PIN_1;
+                          |GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9 
+                          |GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_14|GPIO_PIN_0 
+                          |GPIO_PIN_1;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -643,10 +677,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PD9 PD2 PD3 PD4 
-                           PD5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4 
-                          |GPIO_PIN_5;
+  /*Configure GPIO pins : PD9 PD1 PD2 PD3 
+                           PD4 PD5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3 
+                          |GPIO_PIN_4|GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
@@ -663,8 +697,8 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* FUNC_LED function */
-void FUNC_LED(void const * argument)
+/* FUNC_STATE_LED function */
+void FUNC_STATE_LED(void const * argument)
 {
 
   /* USER CODE BEGIN 5 */
@@ -672,7 +706,7 @@ void FUNC_LED(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-		if(GPRSSTATE & 0x10)
+		if(GPRSSTATE & 0x04)
 		{
 			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_RESET);
 			osDelay(500);
@@ -762,10 +796,12 @@ void FUNC_CAN(void const * argument)
     xSemaphoreTake(CountingSem_canHandle,portMAX_DELAY);
 		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_RESET);
 		get_SHT1x();
+		get_ID();
 		hcan1.pTxMsg->StdId = 0x01;
 		HAL_CAN_Transmit(&hcan1, 1000);
 		HAL_Delay(2000);
 		pcan_rxbuf = &can_rxbuf[0];
+		channel_count = 0;
 		for(i = 0;i < 2 * SUB_BOARD;i ++)
 		{
 			hcan1.pTxMsg->StdId = 2 + ((i + 1) << 4);
@@ -787,6 +823,7 @@ void FUNC_CAN(void const * argument)
 			pcan_rxbuf += 32;
 		}
 		data_calc();
+		test_sensor();
 		memset(can_rxbuf,0,sizeof(can_rxbuf));
   }
   /* USER CODE END FUNC_CAN */
@@ -945,6 +982,30 @@ void FUNC_NEPORT(void const * argument)
 		HAL_UART_Receive_DMA(&huart2,neport_rxbuf,BUFFER_SIZE);
   }
   /* USER CODE END FUNC_NEPORT */
+}
+
+/* FUNC_SENSOR_LED function */
+void FUNC_SENSOR_LED(void const * argument)
+{
+  /* USER CODE BEGIN FUNC_SENSOR_LED */
+	int i;
+  /* Infinite loop */
+	for(;;)
+  {
+		for(i = 0; i < LEDn; i ++)
+		{
+			if(sensor_online[i] == 1)
+			{
+				HAL_GPIO_WritePin(LED_PORT[i], LED_PIN[i], GPIO_PIN_RESET);
+			}
+			else
+			{
+				HAL_GPIO_WritePin(LED_PORT[i], LED_PIN[i], GPIO_PIN_SET);
+			}
+		}
+    osDelay(1000);
+  }
+  /* USER CODE END FUNC_SENSOR_LED */
 }
 
 /**

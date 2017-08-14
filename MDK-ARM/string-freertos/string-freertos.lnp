@@ -24,6 +24,7 @@
 "string-freertos\stm32f4xx_hal_msp.o"
 "string-freertos\stm32f4xx_hal_timebase_tim.o"
 "string-freertos\sht1x.o"
+"string-freertos\led.o"
 "string-freertos\timers.o"
 "string-freertos\port.o"
 "string-freertos\cmsis_os.o"
