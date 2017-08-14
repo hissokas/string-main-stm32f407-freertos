@@ -104,12 +104,13 @@ enum{
 	HANDSHAKE = 0,
 	CONNECT,
 	TCPACK,
+	SHUT,
 	WAITFORCMD,
 	SEND,
-	WAITFORSDC,
-	SHUT
+	WAITFORSDC
 };
 uint8_t GPRSSTATE = 0;
+uint8_t can_error_flag = 0;
 
 /* USER CODE END PV */
 
@@ -667,13 +668,26 @@ void FUNC_LED(void const * argument)
 {
 
   /* USER CODE BEGIN 5 */
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
   /* Infinite loop */
   for(;;)
   {
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_RESET);
-		osDelay(1000);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
-		osDelay(1000);
+		if(GPRSSTATE & 0x10)
+		{
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_RESET);
+			osDelay(500);
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_SET);
+			osDelay(500);
+		}
+		else ;
+		if(can_error_flag)
+		{
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_RESET);
+		}
+		else
+		{
+			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_6, GPIO_PIN_SET);
+		}
   }
   /* USER CODE END 5 */ 
 }
@@ -717,7 +731,7 @@ void FUNC_SERIAL(void const * argument)
 void FUNC_CAN(void const * argument)
 {
   /* USER CODE BEGIN FUNC_CAN */
-	int i,j,can_error_flag;
+	int i,j;
 	uint8_t *pcan_rxbuf;
 	CanTxMsgTypeDef TxMessage;
 	CanRxMsgTypeDef RxMessage;
