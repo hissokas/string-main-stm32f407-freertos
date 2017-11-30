@@ -96,10 +96,10 @@ uint8_t main_ID = 0x01;
 uint16_t humi_val_i = 0,temp_val_i = 0;
 SHT1x sht1x; 
 
-uint8_t sensor_online[LEDn] = {0};
 uint8_t channel_count = 0;
-float sensor_frequency[LEDn] = {0};
-float sensor_temp[LEDn] = {0};
+uint8_t sensor_online[LEDn];
+float sensor_frequency[LEDn];
+float sensor_temp[LEDn];
 extern GPIO_TypeDef* LED_PORT[LEDn];
 extern uint16_t LED_PIN[LEDn];
 
@@ -187,8 +187,8 @@ void data_calc()
 				temp_log = log(adc);
 				sensor_temp[channel_count] = 1.0f / (A + B * temp_log + C * temp_log * temp_log * temp_log) - 273.2f; 
 				
-				frequency = (uint16_t)(sensor_frequency[channel_count] * 10);
-				temp = (uint16_t)(sensor_temp[channel_count] * 100);
+				frequency = (uint16_t)(sensor_frequency[channel_count] * 10.0f);
+				temp = (uint16_t)(sensor_temp[channel_count] * 100.0f);
 				
 				data_to_send[i][s] = frequency >> 8;s++;
 				data_to_send[i][s] = frequency;     s++;
@@ -298,6 +298,9 @@ int main(void)
       }
     }
   }
+	memset(sensor_online,0,sizeof(sensor_online));
+	memset(sensor_frequency,0,sizeof(sensor_frequency));
+	memset(sensor_temp,0,sizeof(sensor_temp));
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
