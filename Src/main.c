@@ -87,7 +87,11 @@ uint8_t serial_rxbuf[BUFFER_SIZE];
 uint8_t neport_rxbuf[BUFFER_SIZE]; 
 uint8_t gprs_rxbuf[BUFFER_SIZE]; 
 uint8_t can_txbuf[8] = {1,2,3,4,5,6,7,8}; 
-uint8_t can_rxbuf[128];
+uint8_t can_rxbuf[5][128];
+uint16_t freq_sortbuf[5][SUB_BOARD][16];
+uint16_t temp_sortbuf[5][SUB_BOARD][16];
+uint8_t can_rxbuf[5][128];
+
 uint8_t serial_rxlen = 0; 
 uint8_t neport_rxlen = 0; 
 uint8_t gprs_rxlen = 0; 
@@ -103,7 +107,7 @@ float sensor_temp[LEDn];
 extern GPIO_TypeDef* LED_PORT[LEDn];
 extern uint16_t LED_PIN[LEDn];
 
-char gprs_connect_str[] = "AT+CIPSTART=\"TCP\",\"xxx.xxx.xxx.xxx\",\"50000\"\r\n";
+char gprs_connect_str[] = "AT+CIPSTART=\"TCP\",\"xxx.xxx.xxx.xxx\",\"50060\"\r\n";
 char gprs_send_str[] = "AT+CIPSEND=81\r\n";
 char gprs_disconnect_str[] = "AT+CIPCLOSE\r\n";
 char gprs_shut_str[] = "AT+CIPSHUT\r\n";
@@ -180,10 +184,10 @@ void data_calc()
 			data_to_send[i][s] = m;s++;
 			for(j = 0;j < 8;j ++)
 			{
-				count = can_rxbuf[j * 4 + m * 32 + i * 64]*256 + can_rxbuf[j * 4 + m * 32 + i * 64 + 1];
+				count = freq_sortbuf[2][i][m * 8 + j]; //can_rxbuf[2][j * 4 + m * 32 + i * 64]*256 + can_rxbuf[2][j * 4 + m * 32 + i * 64 + 1];
 				sensor_frequency[channel_count] = 10000000.0f / count;
 				
-				adc = (can_rxbuf[j * 4 + m * 32 + i * 64 + 2]*256 + can_rxbuf[j * 4 + m * 32 + i * 64 + 3])*4.5185f;
+				adc = temp_sortbuf[2][i][m * 8 + j] * 4.5185f;//(can_rxbuf[2][j * 4 + m * 32 + i * 64 + 2]*256 + can_rxbuf[2][j * 4 + m * 32 + i * 64 + 3])*4.5185f;
 				temp_log = log(adc);
 				sensor_temp[channel_count] = 1.0f / (A + B * temp_log + C * temp_log * temp_log * temp_log) - 273.2f; 
 				
@@ -298,6 +302,9 @@ int main(void)
       }
     }
   }
+	
+	get_ID();
+	
 	memset(sensor_online,0,sizeof(sensor_online));
 	memset(sensor_frequency,0,sizeof(sensor_frequency));
 	memset(sensor_temp,0,sizeof(sensor_temp));
@@ -768,7 +775,7 @@ void FUNC_SERIAL(void const * argument)
 void FUNC_CAN(void const * argument)
 {
   /* USER CODE BEGIN FUNC_CAN */
-	int i,j;
+	int i,j,k,x,temp;
 	uint8_t *pcan_rxbuf;
 	CanTxMsgTypeDef TxMessage;
 	CanRxMsgTypeDef RxMessage;
@@ -799,32 +806,68 @@ void FUNC_CAN(void const * argument)
     xSemaphoreTake(CountingSem_canHandle,portMAX_DELAY);
 		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_7, GPIO_PIN_RESET);
 		get_SHT1x();
-		get_ID();
-		hcan1.pTxMsg->StdId = 0x01;
-		HAL_CAN_Transmit(&hcan1, 1000);
-		HAL_Delay(2000);
-		pcan_rxbuf = &can_rxbuf[0];
-		channel_count = 0;
-		for(i = 0;i < 2 * SUB_BOARD;i ++)
+		for(k = 0;k < 5;k ++)
 		{
-			hcan1.pTxMsg->StdId = 2 + ((i + 1) << 4);
+			hcan1.pTxMsg->StdId = 0x01;
 			HAL_CAN_Transmit(&hcan1, 1000);
-			HAL_Delay(10);
-			can_error_flag = 0;
-			for(j = 0;j < 4;j ++)
+			HAL_Delay(2000);
+			pcan_rxbuf = &can_rxbuf[k][0];
+			channel_count = 0;
+			for(i = 0;i < 2 * SUB_BOARD;i ++)
 			{
-				if(HAL_CAN_Receive(&hcan1, CAN_FIFO0,100) == HAL_OK)
+				hcan1.pTxMsg->StdId = 2 + ((i + 1) << 4);
+				HAL_CAN_Transmit(&hcan1, 1000);
+				HAL_Delay(10);
+				can_error_flag = 0;
+				for(j = 0;j < 4;j ++)
 				{
-					memcpy(pcan_rxbuf + j * 8,hcan1.pRxMsg->Data,8);
+					if(HAL_CAN_Receive(&hcan1, CAN_FIFO0,100) == HAL_OK)
+					{
+						memcpy(pcan_rxbuf + j * 8,hcan1.pRxMsg->Data,8);
+					}
+					else
+					{
+						can_error_flag = i + 1;
+						break;
+					}
 				}
-				else
+				pcan_rxbuf += 32;
+			}
+			HAL_Delay(500);
+		}
+		
+		for(k = 0;k < 5;k ++)
+		{
+			for(i = 0;i < SUB_BOARD;i ++)
+			{   
+					for(j = 0;j < 16;j ++)
+					{
+						freq_sortbuf[k][i][j] = can_rxbuf[k][j * 4 + i * 64]*256 + can_rxbuf[k][j * 4 + i * 64 + 1];
+						temp_sortbuf[k][i][j] = can_rxbuf[k][j * 4 + i * 64 + 2]*256 + can_rxbuf[k][j * 4 + i * 64 + 3];
+					}
+			}
+		}
+		
+
+		for(i = 0;i < SUB_BOARD;i ++)
+		{   
+			for(j = 0;j < 16;j ++)
+			{
+				for(k = 0;k < 4;k ++)
 				{
-					can_error_flag = i + 1;
-					break;
+					for(x = k + 1;x < 5;x ++)
+					{
+						if(freq_sortbuf[k][i][j] > freq_sortbuf[x][i][j])
+						{
+							temp = freq_sortbuf[k][i][j];
+							freq_sortbuf[k][i][j] = freq_sortbuf[x][i][j];
+							freq_sortbuf[x][i][j] = temp;
+						}
+					}
 				}
 			}
-			pcan_rxbuf += 32;
 		}
+		
 		data_calc();
 		test_sensor();
 		memset(can_rxbuf,0,sizeof(can_rxbuf));
@@ -898,7 +941,7 @@ void FUNC_GPRS(void const * argument)
 						if(gprs_rxlen >= 17)
 						{
 							//if(strstr((char *)gprs_rxbuf,"S") != NULL)
-							if(strstr((char *)gprs_rxbuf,"REQUEST FOR DATA!") != NULL)
+							if(strstr((char *)gprs_rxbuf," ") != NULL)
 							{
 								xSemaphoreGive(CountingSem_canHandle);
 								GPRSSTATE = SEND;

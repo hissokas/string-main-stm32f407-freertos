@@ -58,8 +58,8 @@
 
 /* USER CODE BEGIN Private defines */
 #define BUFFER_SIZE 255
-#define SUB_BOARD 2
-#define LEDn 32
+#define SUB_BOARD 1
+#define LEDn 16
 /* USER CODE END Private defines */
 
 void _Error_Handler(char *, int);
